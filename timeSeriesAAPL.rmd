@@ -1,0 +1,186 @@
+
+
+# Introduction
+
+With the ongoing worldwide COVID-19 crisis, there has been significant interest in how the stock market has been impacted. In this analysis, we focus on AAPL (Apple) stock characteristics from the NASDAQ stock exchange __[1]__. Specifically, variables of interest include Date, Opening Price, High Price of the Day, Low Price of the Day, Closing Price, Adjusted Closing Price, and Volume. The data was taken from Yahoo Finance for the period March $14^\text{th}$, 2019 to March $13^\text{th}$, 2020 __[1]__. We are interested in exploring properties of the opening price of the AAPL stock and determining its time series features. Additionally, we aim to select an appropriate model to accurately predict future values of opening price. Given the current state of the COVID-19 crisis and the rising global anxiety, we expect the opening stock prices of subsequent days to further decrease from the last observed opening price on March $13^\text{th}$, 2020. We seek to evaluate this hypothesis using time series modelling techniques. 
+
+# Analysis
+
+An excerpt of the first 10 observations of the dataset is included below to highlight the data structure and present the variables of interest. 
+
+```{r, comment = NA}
+# load data
+aapl_dat <- read.table("C:/Users/Lulu/Downloads/AAPL.csv", header = T, sep = ",")
+head(aapl_dat, 10) 
+```
+
+In this analysis, we focus on investigating the opening price of the AAPL stock. The plot below displays the opening price values measured from March $14^{\text{th}}$, 2019 to March $13^{\text{th}}$, 2020. The time axis has been defined such that 0 denotes the start of the period (March $14^{\text{th}}$, 2019) and subsequent values denote subsequent days. 
+
+```{r, fig.align='center', fig.width=4.5, fig.height=3.5}
+price <- as.ts(aapl_dat$Open)
+par(mar=c(5,4,2,2)+0.1)
+plot(price, ylab = "Opening Price ($USD)", xlab = "Time (days)")
+```
+
+From the raw time series plot of the daily opening prices of AAPL stocks, an evident upwards trend can be observed. Specifically, we note that the maximum opening price value was attained at around `Time` = 225 days (February $3^\text{rd}$) and a subsequent sharp drop was observed following February $20^\text{th}$. This significant drop in stock opening price can most likely be attributed to the start of the COVID-19 pandemic. 
+
+To further assess properties of the time series, ACF and PACF plots can be produced. Such plots are displayed below for the opening stock price data. 
+
+```{r, fig.align='center', fig.width=9, fig.height=4}
+par(mar=c(5,4,2,2)+0.1)
+par(mfrow = c(1,2))
+acf(price, lag.max = 50, main = "")
+pacf(price, lag.max = 50, main = "")
+```
+
+\pagebreak
+
+From the ACF plot, we note highly significant ACF values up to large lag values even beyond 50. This slow decay of ACF values suggests a non-stationary series. Additionally, the PACF plot shows a highly significant value at lag 1, also suggesting the presence of non-stationary effects. This is further supported by the obvious upwards trend displayed in the raw time series plot. A Box-Pierce test was conducted to quantify the degree of non-stationarity and a p-value of approximately 0 was obtained. This highly significant p-value suggests that the series does not appear to be a realization from a white noise process. 
+
+```{r, comment = NA}
+Box.test(price, lag = 50, type = "Box-Pierce")
+```
+
+Since it is preferable to perform time series modelling on a stationary series, we will consider possible transformations to remove the non-stationary effects in the observed series. The most obvious non-stationary effect is the upwards trend. As such, we propose taking first differences to remove the trend. The plot below displays the raw differenced series as well as its corresponding ACF and PACF plots. 
+
+```{r, fig.align='center', fig.width=4.5, fig.height=3.5}
+diff <- diff(price, differences = 1)
+par(mar=c(5,4,2,2)+0.1)
+plot(diff, ylab = "Differenced Opening Price ($USD)", xlab = "Time (days)")
+```
+
+```{r, fig.align='center', fig.width=9, fig.height=4}
+par(mar=c(5,4,2,2)+0.1)
+par(mfrow = c(1,2))
+acf(diff, lag.max = 50, main = "")
+pacf(diff, lag.max = 50, main = "")
+```
+
+From the plot of the differenced series, the non-seasonal trend component of the original series appears to have been successfully removed. The plot shows a relatively constant mean, with some greater variation in difference values towards more recent time points. The ACF and PACF plots are consistent with that of a white noise process in that ACF values after lag 1 and all PACF values are insignificant. To further evaluate the stationarity of the differenced series, a Box-Pierce test can be performed. The Box-Pierce test revealed a p-value of 0.8193, which is insignificant at the 5% significance level suggesting that the differenced series does indeed appear to be a realization of a stationary white noise process. 
+
+```{r, comment = NA}
+Box.test(diff, lag = 50, type = "Box-Pierce")
+```
+
+Now, after obtaining a stationary series, time series modelling can be performed. Various ARMA($p$, $q$) models were assessed, subject to the $p+q \leq 6$ constraint in relation to the principle of parsimony and minimizing number of parameters to be estimated. 
+
+The plots above suggest perhaps a white noise model could be fitted to the differenced series; however, model diagnostics indicate low p-values for the Ljung-Box statistic and an AIC value of 1546.37 which is not one of the lowest AIC values of the models tested.
+
+Among the models tested, the two best models in terms of lowest AIC values and good model diagnostics were an ARMA(2,4) and an ARMA(4,2). Note that code used for model selection can be found in the Appendix. The two selected models are written out in full below, including the estimated parameter values. \newline
+
+ARMA(2,4) model:
+$$(X(t) - 0.335) = -0.132(X(t-1) - 0.335) - 0.861(X(t-2) - 0.335) + Z(t)$$
+$$+ 0.0435Z(t-1) + 0.796Z(t-2) - 0.124Z(t-3) - 0.191Z(t-4)$$
+where $Z(t)$ has variance estimated at 24.25. This model has an AIC value of 1539.34 and model diagnostics look good in that there are no spikes in the ACF plot of residuals and p-values of the Ljung-Box statistic are all large and insignificant. 
+
+ARMA(4,2) model:
+$$(X(t) - 0.331) = -0.097(X(t-1) - 0.331) - 1.007(X(t-2) - 0.331) - 0.1663(X(t-3) - 0.331)$$
+$$- 0.1937(X(t-4) - 0.331) + Z(t) - 0.009Z(t-1) + 0.911Z(t-2)$$
+
+where $Z(t)$ has variance estimated at 24.61. This model has an AIC value of 1539.10 and model diagnostics look good with no spikes in the residual ACF and large p-values of the Ljung-Box statistic. \newline
+
+```{r, include = FALSE}
+arima(diff, order = c(2, 0, 4))
+
+arima(diff, order = c(4, 0, 2))
+```
+
+To further model selection to picking the "best" model for the differenced series, we can split the data into a training set and a test set and perform cross-validation. The ARMA(2,4) and ARMA(4,2) models described previously will be fit to the training set. How well these models perform when fitting values in the test set will be evaluated using mean squared error. Here we will use the last 12 observations (March 2020 observations) as the test set and remaining data will be considered the training set. 
+
+```{r}
+# define training set and test set 
+diff.train <- as.ts(diff[1:240])
+diff.test <- as.ts(diff[241:252])
+
+# ARMA(2,4)
+fit1 <- arima(diff.train, order = c(2,0,4))
+foremodel<- predict(fit1, n.ahead = 12)
+error <- sum((diff[241:252] - foremodel$pred)^2)
+
+# ARMA(4,2)
+fit2 <- arima(diff.train, order = c(4,0,2))
+foremodel<- predict(fit2, n.ahead = 12)
+error <- sum((diff[241:252] - foremodel$pred)^2)
+```
+
+For the ARMA(2,4) model, the computed error sum of squares is 3193.96. For the ARMA(4,2) model, the error was calculated to be 3106.26. Comparing these two values, we choose the ARMA(4,2) model to be the best fit to the difference series as it minimizes the error sum of squares.
+
+The winning ARMA(4,2) model can be subsequently fitted to the entire series to forecast future values in the differenced series. These forecasted difference values can then be manipulated to obtain forecasts of future opening price values. 
+
+When forecasting the next two values of the differenced opening price series, we obtain predictions of 3.084 and 2.283, respectively. Converting these values into opening price predictions (using the last observed opening price value in the dataset on March $13^\text{th}$, 2020), we obtain opening price forecasts of \$267.97 on March $16^\text{th}$, 2020 and \$270.26 on March $17^\text{th}$, 2020. 
+
+```{r}
+# prediction
+fit_full <- arima(diff, order = c(4,0,2))
+predictions <- predict(fit_full, n.ahead = 2)
+pred_1 <- price[253]+predictions$pred[1]
+pred_2 <- pred_1 + predictions$pred[2]
+```
+
+From the Yahoo Finance website, the actual opening price values on March $16^\text{th}$, 2020 and March $17^\text{th}$, 2020 were \$241.95 and \$247.51, respectively. Comparing the forecasted values to the observed values, our forecasts were off by approximately 10%. When looking at the distribution of opening price values, we notice that over the weekend between March $13^\text{th}$ and March $16^\text{th}$, prices dropped quite significantly. The time series model fitted to the past year of daily opening stock prices is likely not sensitive enough to pick up on such unpredictable changes in the stock market due to the COVID-19 crisis. As such, considering the fluctuations in currect stocks, our model has generally performed well in terms of estimating future opening stock prices.
+
+# Conclusion
+
+Initially, our intuition would lead us to believe that the opening price would continue to drop because of panic selling from stockholders. The predictions from our model were actually in the opposite direction. The difficulty of predicting the opening price of a stock, especially during times of crisis is demonstrated here. We fitted multiple ARMA models to our data of a difference transform of opening stock prices and observed that a ARMA(4,2) model provided the best fit. Such a model has a relatively small number of parameters and does not seem overly complex which agrees with the principle of parsimony. Using a part of our data as a test set and the remaining part as the training set, we were able to select a model that predicted future values of the opening price to a moderate degree of accuracy. Both predicted values were approximately 10% greater than what was observed. We believe that there are multiple reasons why this may be the case. Firstly, the fitted model was based on one years worth of data, which may not be sufficient when predicting future values. Secondly, we expected that there would be random fluctuations in the opening price that could not be accurately modeled due to real-world events. Finally, the ongoing COVID-19 pandemic is an anomalous event which could not have been predicted and the fitted models are likely not sensitive enough to capture such unexpected changes. This pandemic has generated an unforeseen impact on a global scale, and the stock market is no exception. As it is difficult to make 100% accurate predictions of the stock market, we have presented a time series model capable of forecasting future opening stock prices up to a tolerable degree of error.
+
+\pagebreak
+
+# Appendix
+
+## Appendix A: Model Selection
+
+Experimented model choices are displayed below. Model selection was performed based on AIC values and model diagnostic tests (__Appendix B__). Selected "best" models are denoted with "***".
+
+```{r, eval = FALSE}
+arima(diff, order = c(0, 0, 0))$aic # AIC = 1546.367
+arima(diff, order = c(1, 0, 1))$aic # AIC = 1545.332
+arima(diff, order = c(1, 0, 2))$aic # AIC = 1545.777
+arima(diff, order = c(1, 0, 3))$aic # AIC = 1547.778
+arima(diff, order = c(1, 0, 4))$aic # AIC = 1546.767
+arima(diff, order = c(1, 0, 5))$aic # AIC = 1545.672
+arima(diff, order = c(2, 0, 1))$aic # AIC = 1545.741
+arima(diff, order = c(3, 0, 1))$aic # AIC = 1547.713
+arima(diff, order = c(4, 0, 1))$aic # AIC = 1548.431
+arima(diff, order = c(5, 0, 1))$aic # AIC = 1546.963
+arima(diff, order = c(2, 0, 2))$aic # AIC = 1545.328
+arima(diff, order = c(2, 0, 3))$aic # AIC = 1546.927
+arima(diff, order = c(2, 0, 4))$aic # AIC = 1539.340 ***
+arima(diff, order = c(3, 0, 2))$aic # AIC = 1546.800
+arima(diff, order = c(4, 0, 2))$aic # AIC = 1539.098 ***
+arima(diff, order = c(3, 0, 3))$aic # AIC = 1542.882
+arima(diff, order = c(1, 0, 0))$aic # AIC = 1546.503
+arima(diff, order = c(2, 0, 0))$aic # AIC = 1544.446
+arima(diff, order = c(3, 0, 0))$aic # AIC = 1545.950
+arima(diff, order = c(4, 0, 0))$aic # AIC = 1546.888
+arima(diff, order = c(5, 0, 0))$aic # AIC = 1547.564
+arima(diff, order = c(6, 0, 0))$aic # AIC = 1548.808
+arima(diff, order = c(0, 0, 1))$aic # AIC = 1545.897
+arima(diff, order = c(0, 0, 2))$aic # AIC = 1543.779
+arima(diff, order = c(0, 0, 3))$aic # AIC = 1545.777
+arima(diff, order = c(0, 0, 4))$aic # AIC = 1547.742
+arima(diff, order = c(0, 0, 5))$aic # AIC = 1547.260
+arima(diff, order = c(0, 0, 6))$aic # AIC = 1548.109
+```
+
+## Appendix B: Model Diagnostics 
+
+Model diagnostic tests performed on the ARMA(2,4) and ARMA(4,2). Visualizations include plots of the standardized residuals, ACF residual plots, and p-value displays for the Ljung-Box statistic. \newline
+
+ARMA(2,4) model:
+
+```{r, fig.align='center', fig.height=7, fig.width=5}
+fit1 <- arima(diff, order = c(2, 0, 4))
+tsdiag(fit1)
+```
+
+ARMA(4,2) model:
+
+```{r, fig.align='center', fig.height=7, fig.width=5}
+fit2 <- arima(diff, order = c(4, 0, 2))
+tsdiag(fit2)
+```
+
+# References
+
+__[1]__ “Apple Inc. (AAPL) Stock Historical Prices & Data - Yahoo Finance.” Retrieved from: https://finance.yahoo.com/quote/AAPL/history?p=AAPL (March 15, 2020).
+
